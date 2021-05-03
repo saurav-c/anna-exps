@@ -1,12 +1,15 @@
-from anna.client.python.anna.client import AnnaTcpClient as ATC
-from anna.client.python.anna.client import AnnaTcpClient as ATC
-from anna.client.python.anna.lattices import LWWPairLattice as LWW
+import sys
+sys.path.append('./../anna/client/python')
+
+
+from anna.client import AnnaTcpClient as ATC
+from anna.client import AnnaTcpClient as ATC
+from anna.lattices import LWWPairLattice as LWW
 
 import argparse
 import numpy as np
 import scipy.stats as stats
 import time
-import sys
 import os
 
 def main():
@@ -61,7 +64,7 @@ def main():
     bounded_zipf = stats.rv_discrete(name='bounded_zipf', values=(x, weights))
 
     num_txn = num_txn if not warmup else num_keys
-    lats, errs = run(bounded_zipf, elb, ip, num_txn, w, r, prefix, debug, warmup)
+    lats, errs = run(bounded_zipf, elb, ip, num_txn, num_reads, num_writes, prefix, debug, warmup)
 
     # Ignore 1st 10%
     lats = lats[(num_txn // 10):]
@@ -82,9 +85,14 @@ def main():
 
 def run(gen, elb, ip, num_txns, num_writes, num_reads, prefix, debug, warmup):
     c = ATC(elb, ip)
+    print('Connected to Anna with ELB {} and my IP {}'.format(elb, ip))
+
     val = os.urandom(4096)
     lat = []
     errs = 0
+
+    print('Performing {} transactions of {} writes and {} reads'.format(num_txns, num_writes, num_reads))
+
     for i in range(num_txns):
         t = 0
         for j in range(num_writes):
