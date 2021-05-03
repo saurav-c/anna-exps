@@ -44,6 +44,8 @@ def main():
     args = parser.parse_args()
 
     warmup = args.warmup
+    if warmup:
+        print('Performing warmup...')
     
     elb = args.address[0]
     ip = args.ip[0]
@@ -94,12 +96,15 @@ def run(gen, elb, ip, num_txns, num_reads, num_writes, prefix, debug, warmup):
     for i in range(num_txns):
         t = 0
         for j in range(num_writes):
-            key = prefix + str(gen.rvs(size=1)[0]) if not warmup else prefix + str(num_txns)
+            key = prefix + str(gen.rvs(size=1)[0]) if not warmup else prefix + str(i)
             lww = LWW(time.time_ns(), val)
             s = time.time()
             resp = c.put(key, lww)
             e = time.time()
             t += (e - s)
+
+            if debug:
+                print('Wrote {}'.format(key))
 
             # Error Check
             if not resp or not all(resp.values()):
