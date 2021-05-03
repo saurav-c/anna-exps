@@ -85,7 +85,7 @@ def main():
     print('99th: {}'.format(ninenine))
     print('Error Count: {}'.format(errs))
 
-def run(gen, elb, ip, num_txns, num_writes, num_reads, prefix, debug, warmup):
+def run(gen, elb, ip, num_txns, num_reads, num_writes, prefix, debug, warmup):
     c = ATC(elb, ip)
     print('Connected to Anna with ELB {} and my IP {}'.format(elb, ip))
 
