@@ -119,7 +119,7 @@ def run(gen, elb, ip, num_txns, num_reads, num_writes, prefix, debug, warmup):
             e = time.time()
             t += (e - s)
             
-            if len(resp) < 1:
+            if len(resp) < 1 or not all(resp.values()):
                 errs += 1
                 if debug:
                     print('Error reading %s' % (key))
