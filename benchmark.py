@@ -39,12 +39,8 @@ def main():
     parser.add_argument('-n', '--numkeys', nargs='?', type=int, metavar='Y',
                         help='Keyspace to choose from',
                         dest='knum', required=False, default=1000)
-    parser.add_argument('-d', '--debug', nargs='?', type=bool, metavar='Y',
-                        help='Whether or not to debug',
-                        dest='debug', required=False, default=False)
-    parser.add_argument('-bw', '--Benchmark', nargs='?', type=bool, metavar='Y',
-                        help='Warmup Benchmark',
-                        dest='warmup', required=False, default=False)
+    parser.add_argument('-d', '--debug', action='store_true', dest='debug')
+    parser.add_argument('-bw', '--warmup', action='store_true', dest='warmup')
     args = parser.parse_args()
 
     warmup = args.warmup
