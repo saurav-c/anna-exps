@@ -48,8 +48,10 @@ def main():
     args = parser.parse_args()
 
     warmup = args.warmup
+    
     elb = args.address[0]
-    ip = args.address[0]
+    ip = args.ip[0]
+
     num_txn = args.txn[0]
     num_reads = args.reads[0]
     num_writes = args.writes[0]
