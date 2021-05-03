@@ -1,26 +1,70 @@
-from anna.client import AnnaTcpClient as ATC
-from anna.client import AnnaTcpClient as ATC
-from anna.lattices import LWWPairLattice as LWW
+from anna.client.python.anna.client import AnnaTcpClient as ATC
+from anna.client.python.anna.client import AnnaTcpClient as ATC
+from anna.client.python.anna.lattices import LWWPairLattice as LWW
+
+import argparse
 import numpy as np
 import scipy.stats as stats
 import time
 import sys
 import os
 
-NUM = 100
-N = 1000
-x = np.arange(1, N)
-
 def main():
-    a = float(sys.argv[1])
-    w = int(sys.argv[2])
-    r = int(sys.argv[3])
-    elb = sys.argv[4]
-    ip = sys.argv[5]
-    weights = x ** (-a)
+
+    parser = argparse.ArgumentParser(description='Anna Benchmark Trigger')
+    parser.add_argument('-a', '--address', nargs=1, type=str, metavar='A',
+                        help='ELB Address for Anna', 
+                        dest='address', required=True)
+    parser.add_argument('-i', '--ip', nargs=1, type=str, metavar='A',
+                        help='My IP Address', 
+                        dest='ip', required=True)
+    parser.add_argument('-t', '--txn', nargs=1, type=int, metavar='Y',
+                        help='The number of txns to be done.',
+                        dest='txn', required=True)
+    parser.add_argument('-r', '--reads', nargs=1, type=int, metavar='Y',
+                        help='The number of reads to be done.',
+                        dest='reads', required=True)
+    parser.add_argument('-w', '--writes', nargs=1, type=int, metavar='Y',
+                        help='The number of writes to be done.',
+                        dest='writes', required=True)
+    parser.add_argument('-z', '--zipf', nargs='?', type=float, metavar='Y',
+                        help='Zipfian coefficient',
+                        dest='zipf', required=False, default=1.0)
+    parser.add_argument('-p', '--pre', nargs='?', type=str, metavar='Y',
+                        help='Prefix key',
+                        dest='prefix', required=False, default='tasc')
+    parser.add_argument('-n', '--numkeys', nargs='?', type=int, metavar='Y',
+                        help='Keyspace to choose from',
+                        dest='knum', required=False, default=1000)
+    parser.add_argument('-d', '--debug', nargs='?', type=bool, metavar='Y',
+                        help='Whether or not to debug',
+                        dest='debug', required=False, default=False)
+    parser.add_argument('-bw', '--Benchmark', nargs='?', type=bool, metavar='Y',
+                        help='Warmup Benchmark',
+                        dest='warmup', required=False, default=False)
+    args = parser.parse_args()
+
+    warmup = args.warmup
+    elb = args.address[0]
+    ip = args.address[0]
+    num_txn = args.txn[0]
+    num_reads = args.reads[0]
+    num_writes = args.writes[0]
+    z = args.zipf
+    prefix = args.prefix
+    num_keys = args.knum
+    debug = args.debug
+
+    x = np.arange(1, num_keys)
+    weights = x ** (-z)
     weights /= weights.sum()
     bounded_zipf = stats.rv_discrete(name='bounded_zipf', values=(x, weights))
-    lats = run(bounded_zipf, w, r, elb, ip)
+
+    num_txn = num_txn if not warmup else num_keys
+    lats, errs = run(bounded_zipf, elb, ip, num_txn, w, r, prefix, debug, warmup)
+
+    # Ignore 1st 10%
+    lats = lats[(num_txn // 10):]
     lats = np.array(lats)
 
     med = np.percentile(lats, 50)
@@ -34,30 +78,49 @@ def main():
     print('5th: {}'.format(five))
     print('95th: {}'.format(ninefive))
     print('99th: {}'.format(ninenine))
+    print('Error Count: {}'.format(errs))
 
-def run(gen, writes, reads, elb, ip):
+def run(gen, elb, ip, num_txns, num_writes, num_reads, prefix, debug, warmup):
     c = ATC(elb, ip)
     val = os.urandom(4096)
     lat = []
-    for i in range(NUM):
+    errs = 0
+    for i in range(num_txns):
         t = 0
-        for j in range(writes):
-            key = str(gen.rvs(size=1)[0])
+        for j in range(num_writes):
+            key = prefix + str(gen.rvs(size=1)[0]) if not warmup else prefix + str(num_txns)
             lww = LWW(time.time_ns(), val)
             s = time.time()
-            c.put(key, lww)
+            resp = c.put(key, lww)
             e = time.time()
-            t += (e-s) * 1000
-        for j in range(reads):
-            key = str(gen.rvs(size=1)[0])
+            t += (e - s)
+
+            # Error Check
+            if not resp or not all(resp.values()):
+                errs += 1
+                if debug:
+                    print('Error writing %s' % (key))
+                    print('Response: {}'.format(resp))
+
+        for j in range(num_reads):
+            key = prefix + str(gen.rvs(size=1)[0])
             s = time.time()
-            r = c.get(key)
+            resp = c.get(key)
             e = time.time()
-            t += (e-s) * 1000
-            if len(r) < 1:
-                print('Error reading key %s' % (key))
-                print(r)
+            t += (e - s)
+            
+            if len(resp) < 1:
+                errs += 1
+                if debug:
+                    print('Error reading %s' % (key))
+                    print('Response: {}'.format(resp))
         lat.append(t)
-    return lat
+
+    convert = lambda x: x * 1000
+    lat = list(map(convert, lat))
+    
+    return (lat, errs)
+
+
 if __name__ == '__main__':
     main()
